@@ -17,4 +17,8 @@ Lieto visam, ko izmaiņa skar, ne tikai jaunajām rindām.
 
 | Vieta (fails:rinda) | Nozīmīgums | Ietekme | Labojums vai pamatojums |
 |---|---|---|---|
-| | bloķējošs / jālabo / sīkums | | |
+| app/storage.py:258 (bandit B608) | jālabo | `withdraw()` SQL vaicājums tika veidots ar f-string. Tajā bija tikai `?` vietturi, bet paraugs viegli kļūst par SQL injekciju. | Labots: statusus nodod kā JSON parametru `json_each(?)`, bandit vairs neziņo, testi zaļi. |
+| app/storage.py:246 | bloķējošs | `update_status` žurnālā rakstīja visu ierakstu: personas kodu, vārdu, e-pastu un tekstu (pārkāpj CR-A 8. kritēriju). | Labots: žurnālā tikai ID un statuss. Tests `test_cra_ac8_no_personal_data_in_logs_or_errors` krīt, ja atjauno veco kodu. |
+| app/errors.py:60 | jālabo | 500 atbildē ir `str(exc)`, tātad iekšējā informācija (ID, SQLite versija). | Atlikts: CR-A ceļš 500 neizraisa, labojums mainītu visus galapunktus. Jāveido atsevišķs pieteikums. |
+| app/storage.py:290 (bandit B608) | bloķējošs CR-B | `find_institution` ievieto `code` tieši SQL vaicājumā, tātad SQL injekcija. | Atlikts uz CR-B: CR-A šo funkciju neizmanto. |
+| requirements.txt:3 (pip-audit) | jālabo | `requests==2.31.0` ir 6 zināmas ievainojamības. | Atlikts: CR-A atkarības nemaina. Jāatjaunina uz 2.33.0 atsevišķi un jāpārbauda ar CR-2 testiem. |

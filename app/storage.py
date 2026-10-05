@@ -3,6 +3,7 @@
 Pēc restarta dati atgriežas sākuma stāvoklī ar trim sintētiskiem iesniegumiem.
 """
 
+import json
 import logging
 import sqlite3
 import threading
@@ -241,9 +242,31 @@ def update_status(submission_id: str, status: str) -> dict | None:
         )
     if cursor.rowcount == 0:
         return None
-    record = get(submission_id)
-    logger.info("Statuss mainīts: %s", record)
-    return record
+    # Žurnālā tikai ID un statuss. Ierakstā ir personas dati.
+    logger.info("Statuss mainīts: %s -> %s", submission_id, status)
+    return get(submission_id)
+
+
+def withdraw(submission_id: str, allowed: list[str], reason: str) -> dict | None:
+    """CR-A: atsauc iesniegumu, ja statuss ir atļauts, un raksta auditu.
+
+    Pārbaude un maiņa ir viens UPDATE, tāpēc divi vienlaicīgi pieprasījumi
+    nevar atsaukt vienu iesniegumu divreiz. Atgriež None, ja statuss nav atļauts.
+    """
+    with _lock:
+        # Atļautos statusus nodod kā vienu JSON parametru: SQL teksts nemainās.
+        cursor = _conn.execute(
+            "UPDATE submissions SET status = 'WITHDRAWN' "
+            "WHERE id = ? AND status IN (SELECT value FROM json_each(?))",
+            (submission_id, json.dumps(allowed)),
+        )
+        if cursor.rowcount == 0:
+            return None
+        _conn.execute(
+            "INSERT INTO audit (submissionId, at, action, detail) VALUES (?, ?, ?, ?)",
+            (submission_id, clock.now().isoformat(), "WITHDRAW", reason),
+        )
+    return get(submission_id)
 
 
 def update_due_date(submission_id: str, due_date: str) -> dict:
